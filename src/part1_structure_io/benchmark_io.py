@@ -56,44 +56,50 @@ def run_scaling_tests(writer):
 
 def run_long_running(writer):
     """Runs the database simulation"""
-    print(f"--> Running Long-Running Simulation (1M Ops)...")
-    # We run this only once or fewer times because it's very long
+    print(f"--> Running Long-Running Simulation (1M Ops) x {REPETITIONS} reps...")
     
-    pool = list(range(LONG_RUN_SIZE * 2))
-    random.shuffle(pool)
-    
-    # Standard
-    avl = AVLTree('standard')
-    for i in range(LONG_RUN_SIZE): avl.insert(pool[i])
-    avl.reset_stats()
-    
-    for k in range(LONG_RUN_OPS):
-        rem = pool[k % LONG_RUN_SIZE]
-        add = pool[(k + LONG_RUN_SIZE) % len(pool)]
-        avl.delete(rem)
-        avl.insert(add)
-        pool[k % LONG_RUN_SIZE] = add
+    for rep in range(1, REPETITIONS + 1):
+        print(f"    ... Repetition {rep}/{REPETITIONS}")
         
-    writer.writerow(['Long_Running', LONG_RUN_SIZE, 1, 'Standard', avl.stats['rotations'], avl.get_height(avl.root)])
-    
-    # Optimized
-    # Re-shuffle for fair variation or keep same pool? Keeping same logic for consistency.
-    # Reset pool logic
-    pool = list(range(LONG_RUN_SIZE * 2)) 
-    random.shuffle(pool)
+        # --- STANDARD ---
+        # Generate fresh pool for this repetition
+        pool = list(range(LONG_RUN_SIZE * 2))
+        random.shuffle(pool)
+        
+        avl = AVLTree('standard')
+        # Initial Population
+        for i in range(LONG_RUN_SIZE): avl.insert(pool[i])
+        avl.reset_stats()
+        
+        # Steady State Ops
+        for k in range(LONG_RUN_OPS):
+            rem = pool[k % LONG_RUN_SIZE]
+            add = pool[(k + LONG_RUN_SIZE) % len(pool)]
+            avl.delete(rem)
+            avl.insert(add)
+            pool[k % LONG_RUN_SIZE] = add
+            
+        writer.writerow(['Long_Running', LONG_RUN_SIZE, rep, 'Standard', avl.stats['rotations'], avl.get_height(avl.root)])
+        
+        # --- OPTIMIZED ---
+        # Generate fresh pool again to ensure fairness and independence
+        pool = list(range(LONG_RUN_SIZE * 2)) 
+        random.shuffle(pool)
 
-    avl = AVLTree('optimized')
-    for i in range(LONG_RUN_SIZE): avl.insert(pool[i])
-    avl.reset_stats()
-    
-    for k in range(LONG_RUN_OPS):
-        rem = pool[k % LONG_RUN_SIZE]
-        add = pool[(k + LONG_RUN_SIZE) % len(pool)]
-        avl.delete(rem)
-        avl.insert(add)
-        pool[k % LONG_RUN_SIZE] = add
+        avl = AVLTree('optimized')
+        # Initial Population
+        for i in range(LONG_RUN_SIZE): avl.insert(pool[i])
+        avl.reset_stats()
+        
+        # Steady State Ops
+        for k in range(LONG_RUN_OPS):
+            rem = pool[k % LONG_RUN_SIZE]
+            add = pool[(k + LONG_RUN_SIZE) % len(pool)]
+            avl.delete(rem)
+            avl.insert(add)
+            pool[k % LONG_RUN_SIZE] = add
 
-    writer.writerow(['Long_Running', LONG_RUN_SIZE, 1, 'Optimized', avl.stats['rotations'], avl.get_height(avl.root)])
+        writer.writerow(['Long_Running', LONG_RUN_SIZE, rep, 'Optimized', avl.stats['rotations'], avl.get_height(avl.root)])
 
 def main():
     data_dir = os.path.join(os.path.dirname(__file__), '../../data')
