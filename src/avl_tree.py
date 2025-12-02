@@ -149,3 +149,24 @@ class AVLTree:
             else:
                 current = current.right
         return False
+    
+    # --- NOVAS MÉTRICAS ESTRUTURAIS (Fase 4) ---
+    def _count_nodes(self, node):
+        if not node: return 0
+        return 1 + self._count_nodes(node.left) + self._count_nodes(node.right)
+
+    def _get_internal_path_length(self, node, current_depth):
+        """Calculates the sum of depths of all nodes."""
+        if not node: return 0
+        return current_depth + \
+               self._get_internal_path_length(node.left, current_depth + 1) + \
+               self._get_internal_path_length(node.right, current_depth + 1)
+
+    def get_average_depth(self):
+        """Returns the average depth of nodes in the tree."""
+        if not self.root: return 0
+        n = self._count_nodes(self.root)
+        if n == 0: return 0
+        
+        total_path_length = self._get_internal_path_length(self.root, 0)
+        return total_path_length / n
