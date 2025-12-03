@@ -3,35 +3,49 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def plot():
-    # Caminhos relativos baseados na estrutura de pastas
+# --- Configurações e Constantes ---
+CSV_REL_PATH = '../../data/results_structure.csv'
+OUT_DIR_REL_PATH = '../../analysis/structure_io'
+
+def configurar_ambiente():
+    """Define caminhos e cria diretórios de saída se necessário."""
     base_dir = os.path.dirname(__file__)
-    data_path = os.path.join(base_dir, '../../data/results_structure.csv')
-    out_dir = os.path.join(base_dir, '../../analysis/structure_io')
+    data_path = os.path.join(base_dir, CSV_REL_PATH)
+    out_dir = os.path.join(base_dir, OUT_DIR_REL_PATH)
     
     if not os.path.exists(out_dir):
         os.makedirs(out_dir)
-    
+        
+    return data_path, out_dir
+
+def carregar_dados(data_path):
+    """Lê o CSV e retorna o DataFrame. Retorna None em caso de erro."""
     print(f"Loading data from: {data_path}")
     try:
-        df = pd.read_csv(data_path)
+        return pd.read_csv(data_path)
     except FileNotFoundError:
         print("Error: CSV file not found. Run the benchmark first.")
-        return
+        return None
 
-    sns.set_theme(style="whitegrid")
-    
-    # --- PLOT 1: Rotations vs Size (Scalability) ---
+def definir_estilo():
+    """Aplica o tema visual global."""
+    sns.set_theme(style="white")
+
+def plotar_escalabilidade(df, out_dir):
+    """Gera o gráfico de linha com legenda limpa (sem títulos de grupo)."""
     print("Generating Scalability Plot...")
     
-    # Filters only scaling scenarios (Random and Sorted)
     df_scaling = df[df['Scenario'].isin(['Random', 'Sorted'])]
+    
+    cores_personalizadas = {
+        "Standard": "#f03a53",
+        "Optimized": "#0bafee"
+    }
     
     plt.figure(figsize=(10, 6))
     
-    # OBS: O Seaborn automaticamente calcula a média e o intervalo de confiança (sombra)
-    # para as 5 repetições. Não é necessário agrupar manualmente aqui.
-    sns.lineplot(
+    # Armazena o objeto do eixo (ax) para manipularmos depois
+    ax = sns.lineplot(
         data=df_scaling, 
         x='Size', 
         y='Total_Rotations', 
@@ -39,84 +53,125 @@ def plot():
         style='Scenario', 
         markers=True, 
         dashes=False,
-        err_style='band' # Desenha a sombra de variação entre os testes
+        err_style='band',
+        palette=cores_personalizadas,
+        linewidth=2.5
     )
     
     plt.xscale('log')
     plt.yscale('log')
-    plt.title('Scalability: Rotations vs Tree Size (Lower is Better)', fontsize=14)
-    plt.ylabel('Total Rotations (Log Scale)', fontsize=12)
-    plt.xlabel('Tree Size N (Log Scale)', fontsize=12)
-    plt.grid(True, which="both", ls="-", alpha=0.5)
+    plt.ylabel('Total Rotations', fontsize=12, labelpad=10)
+    plt.xlabel('Tree Size N', fontsize=12, labelpad=10)
     
-    plot1_path = os.path.join(out_dir, 'rotations_scaling.png')
-    plt.savefig(plot1_path, dpi=300)
-    print(f"Saved: {plot1_path}")
+    # --- [ALTERAÇÃO] Limpeza da Legenda ---
+    # 1. Obtém os "handles" (desenhos) e "labels" (textos) atuais
+    handles, labels = ax.get_legend_handles_labels()
     
-    # --- PLOT 2: Write Amplification Reduction % (Bar Chart) ---
-    print("Generating Efficiency Bar Chart...")
+    # 2. Listas para armazenar apenas o que queremos
+    limpo_handles = []
+    limpo_labels = []
     
-    # 1. Agrupar por Cenário/Método/Tamanho e tirar a MÉDIA das 5 repetições
-    # Isso é crucial agora que temos múltiplas execuções para todos os cenários.
+    # 3. Filtra: guarda tudo que NÃO for os títulos indesejados
+    for h, l in zip(handles, labels):
+        if l not in ['Method', 'Scenario']:
+            limpo_handles.append(h)
+            limpo_labels.append(l)
+            
+    # 4. Recria a legenda com a lista filtrada e sem borda
+    ax.legend(limpo_handles, limpo_labels, frameon=False)
+    
+    sns.despine()
+    
+    save_path = os.path.join(out_dir, 'rotations_scaling.png')
+    plt.savefig(save_path, dpi=600, bbox_inches='tight')
+    print(f"Saved: {save_path}")
+    plt.close()
+
+def _calcular_reducao_percentual(df):
+    """(Função Auxiliar) Processa os dados para calcular a redução percentual."""
+    # Agrupamento e média
     df_mean = df.groupby(['Scenario', 'Method', 'Size'], as_index=False)['Total_Rotations'].mean()
     
-    # 2. Selecionar os dados para comparação
-    # Para Random e Sorted, pegamos o MAIOR tamanho testado (ex: 1.000.000)
+    # Filtra alto volume para Random/Sorted e pega Long_Running
     max_size = df[df['Scenario'] != 'Long_Running']['Size'].max()
+    
     df_high_volume = df_mean[
         (df_mean['Size'] == max_size) & 
         (df_mean['Scenario'].isin(['Random', 'Sorted']))
     ].copy()
     
-    # Para Long_Running, pegamos ele independente do tamanho (pois ele representa 1M ops)
     df_long = df_mean[df_mean['Scenario'] == 'Long_Running'].copy()
-    
-    # 3. Combinar os dados
     df_final = pd.concat([df_high_volume, df_long])
     
-    # 4. Calcular a redução percentual usando Pivot Table
+    # Pivot e cálculo matemático
     pivot = df_final.pivot(index='Scenario', columns='Method', values='Total_Rotations')
-    
-    # Fórmula: (Standard - Optimized) / Standard
     pivot['Reduction_Pct'] = ((pivot['Standard'] - pivot['Optimized']) / pivot['Standard']) * 100
     
-    # Ordenar para exibição consistente
-    # Vamos reindexar para garantir uma ordem lógica no gráfico
+    # Reordena e prepara para o plot
     desired_order = ['Random', 'Sorted', 'Long_Running']
     pivot = pivot.reindex(desired_order)
     
-    # Debug: Mostrar os valores calculados no console
-    print("\nCalculated Reductions:")
-    print(pivot['Reduction_Pct'])
+    # --- ALTERAÇÃO AQUI ---
+    # Renomeia o rótulo do índice antes de resetar
+    pivot = pivot.rename(index={'Long_Running': 'Long Running'})
     
-    # Plotagem
+    return pivot.reset_index()
+
+def plotar_eficiencia(df, out_dir):
+    """Gera o gráfico de barras (Write Amplification Reduction %)."""
+    print("Generating Efficiency Bar Chart...")
+    
+    plot_data = _calcular_reducao_percentual(df)
+    custom_palette = ["#0bafee", "#f03a53", "#ffb91b"]
+
     plt.figure(figsize=(8, 6))
-    
-    # Reset index para usar no barplot
-    plot_data = pivot.reset_index()
     
     ax = sns.barplot(
         data=plot_data,
         x='Scenario', 
         y='Reduction_Pct', 
-        color='cornflowerblue',
-        edgecolor='black'
+        hue='Scenario',
+        palette=custom_palette,
+        edgecolor=None, 
+        dodge=False,
+        width=0.5
     )
     
-    # Adicionar os rótulos de porcentagem
+    # Rótulos das barras
     for container in ax.containers:
-        ax.bar_label(container, fmt='%.1f%%', padding=3, weight='bold', fontsize=11)
+        ax.bar_label(container, fmt='%.1f%%', padding=5, weight='bold', fontsize=12, color='#333333')
+        
+    plt.ylim(0, 25)
+    plt.ylabel('Reduction in Rotations (%)', fontsize=12, labelpad=10)
+    plt.xlabel('') 
+    plt.xticks(fontsize=12, weight='medium')
     
-    plt.title('Write Reduction Efficiency (High Volume)', fontsize=14)
-    plt.ylabel('Reduction in Rotations (%)', fontsize=12)
-    plt.xlabel('Scenario', fontsize=12)
-    plt.ylim(0, max(pivot['Reduction_Pct']) * 1.2) # Dá 20% de respiro no topo
+    # Estilização fina
+    sns.despine(left=True, top=True, right=True)
+    plt.tick_params(axis='y', length=0)
     
-    plot2_path = os.path.join(out_dir, 'reduction_efficiency.png')
-    plt.savefig(plot2_path, dpi=300)
-    print(f"Saved: {plot2_path}")
+    save_path = os.path.join(out_dir, 'reduction_efficiency.png')
+    plt.savefig(save_path, dpi=600, bbox_inches='tight')
+    print(f"Saved: {save_path}")
+    plt.close()
+
+def main():
+    # 1. Configuração
+    data_path, out_dir = configurar_ambiente()
+    
+    # 2. Carregamento
+    df = carregar_dados(data_path)
+    if df is None:
+        return
+
+    # 3. Estilo
+    definir_estilo()
+    
+    # 4. Geração dos Gráficos
+    plotar_escalabilidade(df, out_dir)
+    plotar_eficiencia(df, out_dir)
     
     print("\nAll plots generated successfully.")
 
 if __name__ == '__main__':
-    plot()
+    main()
