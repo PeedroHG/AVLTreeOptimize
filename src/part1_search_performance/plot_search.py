@@ -3,37 +3,107 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import os
 
-def plot():
-    data_path = os.path.join(os.path.dirname(__file__), '../../data/results_search.csv')
-    out_dir = os.path.join(os.path.dirname(__file__), '../../analysis/search_performance')
-    if not os.path.exists(out_dir): os.makedirs(out_dir)
+DATA_PATH = os.path.join(os.path.dirname(__file__), '../../data/results_unified_search.csv')
+OUT_DIR = os.path.join(os.path.dirname(__file__), '../../analysis/search_performance')
+
+# Cores definidas:
+COLORS = {
+    'Standard': '#f03a53',
+    'Optimized': '#0bafee'
+}
+
+ORDER = ['Standard', 'Optimized']  # ordem fixa
+
+
+def load_data():
+    if not os.path.exists(DATA_PATH):
+        print("Erro: CSV não encontrado.")
+        return None
     
-    print("Generating Search Performance Plots...")
-    df = pd.read_csv(data_path)
-    sns.set_theme(style="whitegrid")
-    
-    # Plot 1: Search Latency Comparison
-    plt.figure(figsize=(8, 6))
-    ax = sns.barplot(data=df, x='Method', y='Avg_Search_Time_ns', palette=['#4c72b0', '#dd8452'])
-    
+    if not os.path.exists(OUT_DIR):
+        os.makedirs(OUT_DIR)
+
+    return pd.read_csv(DATA_PATH)
+
+
+# ============================================================
+# 1) LATÊNCIA
+# ============================================================
+def plot_latency():
+    df = load_data()
+    if df is None:
+        return
+
+    sns.set_theme(style="white")
+    plt.figure(figsize=(7, 5))
+
+    # barras sem desvio (erro = None) e ordem fixa
+    ax = sns.barplot(
+        data=df,
+        x='Method',
+        y='Avg_Search_Time_ns',
+        hue='Method',
+        palette=COLORS,
+        order=ORDER,
+        hue_order=ORDER,
+        legend=False,
+        width=0.45,
+        errorbar=None  # remove indicativo de desvio
+    )
+
     for container in ax.containers:
-        ax.bar_label(container, fmt='%.1f ns', padding=3, fontsize=12)
-        
-    plt.title('Average Search Latency (Read Performance)', fontsize=14)
-    plt.ylabel('Time per Search (nanoseconds)', fontsize=12)
-    plt.ylim(0, df['Avg_Search_Time_ns'].max() * 1.2)
-    
-    # Add text annotation about height
-    h_std = df[df['Method']=='Standard']['Final_Height'].values[0]
-    h_opt = df[df['Method']=='Optimized']['Final_Height'].values[0]
-    
-    plt.text(0, df['Avg_Search_Time_ns'].min() * 0.5, f"Height: {h_std}", 
-             ha='center', color='white', fontweight='bold')
-    plt.text(1, df['Avg_Search_Time_ns'].min() * 0.5, f"Height: {h_opt}", 
-             ha='center', color='white', fontweight='bold')
+        ax.bar_label(container, fmt='%.1f ns', padding=3, fontweight='bold')
 
-    plt.savefig(os.path.join(out_dir, 'search_latency.png'), dpi=300)
-    print("Plot generated: search_latency.png")
+    plt.ylabel("Search Time (ns)", fontsize=12)
 
+    sns.despine(top=True, right=True)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUT_DIR, 'search_latency.png'), dpi=600)
+    print("Gráfico salvo: search_latency.png")
+
+
+# ============================================================
+# 2) PROFUNDIDADE
+# ============================================================
+def plot_depth():
+    df = load_data()
+    if df is None:
+        return
+
+    sns.set_theme(style="white")
+    plt.figure(figsize=(7, 5))
+
+    means = df.groupby('Method')['Avg_Depth'].mean().reset_index()
+
+    ax = sns.barplot(
+        data=means,
+        x='Method',
+        y='Avg_Depth',
+        hue='Method',
+        palette=COLORS,
+        order=ORDER,
+        hue_order=ORDER,
+        legend=False,
+        width=0.45,
+        errorbar=None  # remove indicativo de desvio
+    )
+
+    for container in ax.containers:
+        ax.bar_label(container, fmt='%.3f', padding=3, fontweight='bold')
+
+    plt.ylabel("Average Depth", fontsize=12)
+
+    sns.despine(top=True, right=True)
+
+    plt.tight_layout()
+    plt.savefig(os.path.join(OUT_DIR, 'avg_depth.png'), dpi=600)
+    print("Gráfico salvo: avg_depth.png")
+
+
+# ============================================================
+# Execução
+# ============================================================
 if __name__ == '__main__':
-    plot()
+    plot_latency()
+    plot_depth()

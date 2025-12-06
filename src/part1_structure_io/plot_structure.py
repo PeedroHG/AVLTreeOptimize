@@ -44,7 +44,6 @@ def plotar_escalabilidade(df, out_dir):
     
     plt.figure(figsize=(10, 6))
     
-    # Armazena o objeto do eixo (ax) para manipularmos depois
     ax = sns.lineplot(
         data=df_scaling, 
         x='Size', 
@@ -63,21 +62,16 @@ def plotar_escalabilidade(df, out_dir):
     plt.ylabel('Total Rotations', fontsize=12, labelpad=10)
     plt.xlabel('Tree Size N', fontsize=12, labelpad=10)
     
-    # --- [ALTERAÇÃO] Limpeza da Legenda ---
-    # 1. Obtém os "handles" (desenhos) e "labels" (textos) atuais
     handles, labels = ax.get_legend_handles_labels()
     
-    # 2. Listas para armazenar apenas o que queremos
     limpo_handles = []
     limpo_labels = []
     
-    # 3. Filtra: guarda tudo que NÃO for os títulos indesejados
     for h, l in zip(handles, labels):
         if l not in ['Method', 'Scenario']:
             limpo_handles.append(h)
             limpo_labels.append(l)
             
-    # 4. Recria a legenda com a lista filtrada e sem borda
     ax.legend(limpo_handles, limpo_labels, frameon=False)
     
     sns.despine()
@@ -88,32 +82,37 @@ def plotar_escalabilidade(df, out_dir):
     plt.close()
 
 def _calcular_reducao_percentual(df):
-    """(Função Auxiliar) Processa os dados para calcular a redução percentual."""
-    # Agrupamento e média
+    """Processa os dados para calcular a redução percentual usando SEMPRE tamanho N = 100k."""
+    
+    # Média por grupo
     df_mean = df.groupby(['Scenario', 'Method', 'Size'], as_index=False)['Total_Rotations'].mean()
     
-    # Filtra alto volume para Random/Sorted e pega Long_Running
-    max_size = df[df['Scenario'] != 'Long_Running']['Size'].max()
+    # Volume fixo comum a todos os cenários
+    target_size = 100000
     
-    df_high_volume = df_mean[
-        (df_mean['Size'] == max_size) & 
-        (df_mean['Scenario'].isin(['Random', 'Sorted']))
+    # RANDOM + SORTED para N = 100k
+    df_static = df_mean[
+        (df_mean['Scenario'].isin(['Random', 'Sorted'])) &
+        (df_mean['Size'] == target_size)
     ].copy()
     
+    # LONG RUNNING (já é 100k)
     df_long = df_mean[df_mean['Scenario'] == 'Long_Running'].copy()
-    df_final = pd.concat([df_high_volume, df_long])
     
-    # Pivot e cálculo matemático
+    # Junta os três cenários
+    df_final = pd.concat([df_static, df_long], ignore_index=True)
+    
+    # Tabela pivot
     pivot = df_final.pivot(index='Scenario', columns='Method', values='Total_Rotations')
+    
+    # Cálculo
     pivot['Reduction_Pct'] = ((pivot['Standard'] - pivot['Optimized']) / pivot['Standard']) * 100
     
-    # Reordena e prepara para o plot
-    desired_order = ['Random', 'Sorted', 'Long_Running']
-    pivot = pivot.reindex(desired_order)
-    
-    # --- ALTERAÇÃO AQUI ---
-    # Renomeia o rótulo do índice antes de resetar
+    # Renomeia cenário para estética
     pivot = pivot.rename(index={'Long_Running': 'Long Running'})
+    
+    # Ordem correta de exibição
+    pivot = pivot.reindex(['Random', 'Sorted', 'Long Running'])
     
     return pivot.reset_index()
 
@@ -137,7 +136,7 @@ def plotar_eficiencia(df, out_dir):
         width=0.5
     )
     
-    # Rótulos das barras
+    # Labels nas barras
     for container in ax.containers:
         ax.bar_label(container, fmt='%.1f%%', padding=5, weight='bold', fontsize=12, color='#333333')
         
@@ -146,7 +145,6 @@ def plotar_eficiencia(df, out_dir):
     plt.xlabel('') 
     plt.xticks(fontsize=12, weight='medium')
     
-    # Estilização fina
     sns.despine(left=True, top=True, right=True)
     plt.tick_params(axis='y', length=0)
     
