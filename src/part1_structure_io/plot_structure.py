@@ -1,11 +1,15 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
+from scipy.stats import linregress
 import os
+import sys
+from io import StringIO # Usado para capturar a saída do print
 
 # --- Configurações e Constantes ---
 CSV_REL_PATH = '../../data/results_structure.csv'
 OUT_DIR_REL_PATH = '../../analysis/structure_io'
+ANALYSIS_OUTPUT_FILENAME = 'linear_regression_analysis.txt' # Novo nome do arquivo de saída
 
 def configurar_ambiente():
     """Define caminhos e cria diretórios de saída se necessário."""
@@ -31,30 +35,91 @@ def definir_estilo():
     """Aplica o tema visual global."""
     sns.set_theme(style="white")
 
+def registrar_analise_em_arquivo(out_dir, analise_text):
+    """Salva a saída da análise de regressão linear em um arquivo."""
+    save_path = os.path.join(out_dir, ANALYSIS_OUTPUT_FILENAME)
+    try:
+        with open(save_path, 'w', encoding='utf-8') as f:
+            f.write(analise_text)
+        print(f"\nAnalysis saved to: {save_path}")
+    except Exception as e:
+        print(f"Error saving analysis file: {e}")
+
 def plotar_escalabilidade(df, out_dir):
-    """Gera o gráfico de linha com legenda limpa (sem títulos de grupo)."""
+    """Gera gráfico e calcula a redução percentual baseada nas inclinações (Slopes)."""
     print("Generating Scalability Plot...")
     
     df_scaling = df[df['Scenario'].isin(['Random', 'Sorted'])]
+
+    # Dicionário para guardar as inclinações: { 'Scenario': { 'Method': slope } }
+    analise_slopes = {}
     
-    cores_personalizadas = {
-        "Standard": "#f03a53",
-        "Optimized": "#0bafee"
-    }
+    # --- Preparação para Capturar a Saída do Console ---
+    old_stdout = sys.stdout
+    redirected_output = sys.stdout = StringIO() # Redireciona o print para uma string
+
+    print("\n" + "="*50)
+    print("      ANÁLISE DE REGRESSÃO LINEAR (y = ax + b)")
+    print("="*50)
     
+    grupos = df_scaling.groupby(['Method', 'Scenario'])
+    
+    for (method, scenario), dados_grupo in grupos:
+        # Pega a média de rotações por tamanho para o fit ser preciso
+        media_por_tamanho = dados_grupo.groupby('Size')['Total_Rotations'].mean().reset_index()
+        
+        x = media_por_tamanho['Size']
+        y = media_por_tamanho['Total_Rotations']
+        
+        # Calcula regressão
+        slope, intercept, r_value, _, _ = linregress(x, y)
+        
+        # Guarda o slope para comparar depois
+        if scenario not in analise_slopes:
+            analise_slopes[scenario] = {}
+        analise_slopes[scenario][method] = slope
+        
+        print(f"[{scenario}] - [{method}]")
+        print(f"  Equação: y = {slope:.5f}x + ({intercept:.5f})")
+        print(f"  R²: {r_value**2:.4f}")
+        print("-" * 30)
+
+    # --- CÁLCULO DA DIFERENÇA PERCENTUAL (Baseado nos Slopes) ---
+    print("\n" + "="*50)
+    print("      GANHO DE PERFORMANCE (BASEADO NA INCLINAÇÃO)")
+    print("="*50)
+    
+    for scenario, methods in analise_slopes.items():
+        if 'Standard' in methods and 'Optimized' in methods:
+            slope_std = methods['Standard']
+            slope_opt = methods['Optimized']
+            
+            # Cálculo da redução percentual
+            reducao = ((slope_std - slope_opt) / slope_std) * 100
+            
+            print(f"CENÁRIO: {scenario}")
+            print(f"  Inclinação Standard : {slope_std:.5f}")
+            print(f"  Inclinação Optimized: {slope_opt:.5f}")
+            print(f"  >> REDUÇÃO DE CUSTO : {reducao:.2f}%")
+            print("-" * 30)
+    print("="*50 + "\n")
+
+    # --- Fim da Captura de Saída ---
+    sys.stdout = old_stdout # Restaura o stdout original
+    analise_text = redirected_output.getvalue()
+    print(analise_text, end='') # Imprime no console o que foi capturado
+
+    # --- Registro em Arquivo ---
+    registrar_analise_em_arquivo(out_dir, analise_text)
+
+    # --- Plotagem (Mantida igual para gerar o visual) ---
+    cores_personalizadas = { "Standard": "#f03a53", "Optimized": "#0bafee" }
     plt.figure(figsize=(10, 6))
     
     ax = sns.lineplot(
-        data=df_scaling, 
-        x='Size', 
-        y='Total_Rotations', 
-        hue='Method', 
-        style='Scenario', 
-        markers=True, 
-        dashes=False,
-        err_style='band',
-        palette=cores_personalizadas,
-        linewidth=2.5
+        data=df_scaling, x='Size', y='Total_Rotations', hue='Method', 
+        style='Scenario', markers=True, dashes=False, err_style='band',
+        palette=cores_personalizadas, linewidth=2.5
     )
     
     plt.xscale('log')
@@ -63,24 +128,17 @@ def plotar_escalabilidade(df, out_dir):
     plt.xlabel('Tree Size N', fontsize=12, labelpad=10)
     
     handles, labels = ax.get_legend_handles_labels()
-    
-    limpo_handles = []
-    limpo_labels = []
-    
-    for h, l in zip(handles, labels):
-        if l not in ['Method', 'Scenario']:
-            limpo_handles.append(h)
-            limpo_labels.append(l)
+    limpo_handles = [h for h, l in zip(handles, labels) if l not in ['Method', 'Scenario']]
+    limpo_labels = [l for h, l in zip(handles, labels) if l not in ['Method', 'Scenario']]
             
     ax.legend(limpo_handles, limpo_labels, frameon=False)
-    
     sns.despine()
     
     save_path = os.path.join(out_dir, 'rotations_scaling.png')
     plt.savefig(save_path, dpi=600, bbox_inches='tight')
     print(f"Saved: {save_path}")
     plt.close()
-
+    
 def _calcular_reducao_percentual(df):
     """Processa os dados para calcular a redução percentual usando SEMPRE tamanho N = 100k."""
     
@@ -165,11 +223,11 @@ def main():
     # 3. Estilo
     definir_estilo()
     
-    # 4. Geração dos Gráficos
-    plotar_escalabilidade(df, out_dir)
+    # 4. Geração dos Gráficos e Registro da Análise
+    plotar_escalabilidade(df, out_dir) # Esta função agora também registra a análise
     plotar_eficiencia(df, out_dir)
     
-    print("\nAll plots generated successfully.")
+    print("\nAll plots and analysis registered successfully.")
 
 if __name__ == '__main__':
     main()
