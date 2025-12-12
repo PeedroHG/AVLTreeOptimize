@@ -1,6 +1,5 @@
 import sys
 
-# Increase recursion depth just in case
 sys.setrecursionlimit(200000)
 
 class Node:
@@ -29,7 +28,6 @@ class AVLTree:
         if not node: return 0
         return self.get_height(node.left) - self.get_height(node.right)
 
-    # --- HELPERS ---
     def _get_min_node(self, node):
         current = node
         while current.left: current = current.left
@@ -40,7 +38,6 @@ class AVLTree:
         while current.right: current = current.right
         return current
 
-    # --- ROTATIONS ---
     def _rotate_right(self, z):
         self.stats['rotations'] += 1
         y = z.left
@@ -61,7 +58,6 @@ class AVLTree:
         y.height = 1 + max(self.get_height(y.left), self.get_height(y.right))
         return y
 
-    # --- INSERT ---
     def insert(self, key):
         self.root = self._insert_recursive(self.root, key)
 
@@ -85,7 +81,6 @@ class AVLTree:
             return self._rotate_left(node)
         return node
 
-    # --- DELETE ---
     def delete(self, key):
         self.root = self._delete_recursive(self.root, key)
 
@@ -138,7 +133,6 @@ class AVLTree:
             return self._rotate_left(node)
         return node
     
-    # --- SEARCH (Read Operation) ---
     def search(self, key):
         current = self.root
         while current:
@@ -150,7 +144,6 @@ class AVLTree:
                 current = current.right
         return False
     
-    # --- NOVAS MÉTRICAS ESTRUTURAIS (Fase 4) ---
     def _count_nodes(self, node):
         if not node: return 0
         return 1 + self._count_nodes(node.left) + self._count_nodes(node.right)

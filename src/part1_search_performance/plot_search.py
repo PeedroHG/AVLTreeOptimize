@@ -6,13 +6,12 @@ import os
 DATA_PATH = os.path.join(os.path.dirname(__file__), '../../data/results_unified_search.csv')
 OUT_DIR = os.path.join(os.path.dirname(__file__), '../../analysis/search_performance')
 
-# Cores definidas:
 COLORS = {
     'Standard': '#f03a53',
     'Optimized': '#0bafee'
 }
 
-ORDER = ['Standard', 'Optimized']  # ordem fixa
+ORDER = ['Standard', 'Optimized'] 
 
 
 def load_data():
@@ -26,9 +25,6 @@ def load_data():
     return pd.read_csv(DATA_PATH)
 
 
-# ============================================================
-# 1) LATÊNCIA
-# ============================================================
 def plot_latency():
     df = load_data()
     if df is None:
@@ -37,7 +33,6 @@ def plot_latency():
     sns.set_theme(style="white")
     plt.figure(figsize=(7, 5))
 
-    # barras sem desvio (erro = None) e ordem fixa
     ax = sns.barplot(
         data=df,
         x='Method',
@@ -48,7 +43,7 @@ def plot_latency():
         hue_order=ORDER,
         legend=False,
         width=0.45,
-        errorbar=None  # remove indicativo de desvio
+        errorbar=None 
     )
 
     for container in ax.containers:
@@ -63,9 +58,7 @@ def plot_latency():
     print("Gráfico salvo: search_latency.png")
 
 
-# ============================================================
-# 2) PROFUNDIDADE
-# ============================================================
+
 def plot_depth():
     df = load_data()
     if df is None:
@@ -86,7 +79,7 @@ def plot_depth():
         hue_order=ORDER,
         legend=False,
         width=0.45,
-        errorbar=None  # remove indicativo de desvio
+        errorbar=None
     )
 
     for container in ax.containers:
@@ -101,9 +94,6 @@ def plot_depth():
     print("Gráfico salvo: avg_depth.png")
 
 
-# ============================================================
-# Execução
-# ============================================================
 if __name__ == '__main__':
     plot_latency()
     plot_depth()

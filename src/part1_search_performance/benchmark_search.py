@@ -4,18 +4,15 @@ import time
 import csv
 import random
 
-# Setup path para importar a classe AVL
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 from avl_tree import AVLTree
 
-# --- CONFIGURAÇÃO ---
 TREE_SIZE = 100000 
-LONG_RUN_OPS = 500000 # Fase de Estresse
-SEARCH_OPS = 1000000  # Fase de Teste de Leitura
-REPETITIONS = 5       # Repetições para média estatística
+LONG_RUN_OPS = 500000
+SEARCH_OPS = 1000000
+REPETITIONS = 5  
 
 def run_unified_benchmark():
-    # Cria diretório de dados
     data_dir = os.path.join(os.path.dirname(__file__), '../../data')
     if not os.path.exists(data_dir): os.makedirs(data_dir)
     csv_path = os.path.join(data_dir, 'results_unified_search.csv')
@@ -25,45 +22,35 @@ def run_unified_benchmark():
     
     with open(csv_path, 'w', newline='') as f:
         writer = csv.writer(f)
-        # Cabeçalho completo com todas as métricas conectadas
         writer.writerow([
             'Method', 'Repetition', 
             'Final_Height', 'Avg_Depth', 
             'Total_Search_Time_ms', 'Avg_Search_Time_ns'
         ])
 
-        # --- LOOP DE REPETIÇÕES ---
         for r in range(1, REPETITIONS + 1):
             print(f"\n>>> Rodada {r}/{REPETITIONS}")
             
-            # Preparar o Pool de Dados (Comum para ambos para ser justo)
             pool = list(range(TREE_SIZE * 2))
             random.shuffle(pool)
             
-            # ==========================================
-            # 1. MÉTODO PADRÃO (STANDARD)
-            # ==========================================
             print("   [Standard] 1. Construindo e Estressando...", end='\r')
             avl_std = AVLTree('standard')
             
-            # A) Warm-up (Encher a árvore)
             for i in range(TREE_SIZE): avl_std.insert(pool[i])
             
-            # B) Long Running (Estresse)
             for k in range(LONG_RUN_OPS):
                 rem = pool[k % TREE_SIZE]
                 add = pool[(k + TREE_SIZE) % len(pool)]
                 avl_std.delete(rem)
                 avl_std.insert(add)
-                pool[k % TREE_SIZE] = add # Atualiza pool virtual
+                pool[k % TREE_SIZE] = add 
             
-            # C) Coleta de Métricas Estruturais (Na árvore estressada)
             h_std = avl_std.get_height(avl_std.root)
             depth_std = avl_std.get_average_depth()
-            
-            # D) Benchmark de Busca (Na mesma árvore)
+
             print(f"   [Standard] 2. Buscando {SEARCH_OPS} chaves...      ", end='\r')
-            search_keys = pool[:TREE_SIZE] # Chaves que sabemos que estão lá
+            search_keys = pool[:TREE_SIZE]
             
             start = time.perf_counter()
             for _ in range(SEARCH_OPS // TREE_SIZE):
@@ -77,21 +64,16 @@ def run_unified_benchmark():
             writer.writerow(['Standard', r, h_std, depth_std, time_std_ms, time_std_ns])
             print(f"   [Standard] Concluído: H={h_std}, Depth={depth_std:.3f}, Time={time_std_ns:.1f}ns")
             
-            del avl_std # Limpar memória
+            del avl_std
 
-            # ==========================================
-            # 2. MÉTODO OTIMIZADO (OPTIMIZED)
-            # ==========================================
-            # Re-embaralhar pool para garantir independência estatística
             random.shuffle(pool)
             
             print("   [Optimized] 1. Construindo e Estressando...", end='\r')
             avl_opt = AVLTree('optimized')
             
-            # A) Warm-up
+
             for i in range(TREE_SIZE): avl_opt.insert(pool[i])
             
-            # B) Long Running
             for k in range(LONG_RUN_OPS):
                 rem = pool[k % TREE_SIZE]
                 add = pool[(k + TREE_SIZE) % len(pool)]
@@ -99,11 +81,9 @@ def run_unified_benchmark():
                 avl_opt.insert(add)
                 pool[k % TREE_SIZE] = add
             
-            # C) Métricas Estruturais
             h_opt = avl_opt.get_height(avl_opt.root)
             depth_opt = avl_opt.get_average_depth()
             
-            # D) Benchmark de Busca
             print(f"   [Optimized] 2. Buscando {SEARCH_OPS} chaves...      ", end='\r')
             search_keys = pool[:TREE_SIZE]
             

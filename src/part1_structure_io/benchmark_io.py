@@ -9,8 +9,8 @@ from avl_tree import AVLTree
 # --- CONFIGURATION ---
 SIZES = [1000, 10000, 100000, 1000000]
 REPETITIONS = 5
-LONG_RUN_SIZE = 100000 # Fixed size for long running to keep it feasible
-LONG_RUN_OPS = 1000000 # 1 Million Ops
+LONG_RUN_SIZE = 100000 
+LONG_RUN_OPS = 1000000 
 
 def run_scaling_tests(writer):
     """Runs Random and Sorted scenarios across different sizes"""
@@ -19,35 +19,28 @@ def run_scaling_tests(writer):
         base_data = list(range(n))
         
         for rep in range(1, REPETITIONS + 1):
-            # --- SCENARIO: RANDOM ---
             random.shuffle(base_data)
             to_delete = base_data[:n//2]
             
-            # Standard
             avl = AVLTree('standard')
             for x in base_data: avl.insert(x)
             avl.reset_stats()
             for x in to_delete: avl.delete(x)
             writer.writerow(['Random', n, rep, 'Standard', avl.stats['rotations'], avl.get_height(avl.root)])
-            
-            # Optimized
+
             avl = AVLTree('optimized')
             for x in base_data: avl.insert(x)
             avl.reset_stats()
             for x in to_delete: avl.delete(x)
             writer.writerow(['Random', n, rep, 'Optimized', avl.stats['rotations'], avl.get_height(avl.root)])
-            
-            # --- SCENARIO: SORTED (Worst Case) ---
-            # Insert 0..N (Sorted), Delete Randomly
-            
-            # Standard
+
             avl = AVLTree('standard')
-            for i in range(n): avl.insert(i) # Sorted Insert
+            for i in range(n): avl.insert(i) 
             avl.reset_stats()
-            for x in to_delete: avl.delete(x) # Random Delete
+            for x in to_delete: avl.delete(x) 
             writer.writerow(['Sorted', n, rep, 'Standard', avl.stats['rotations'], avl.get_height(avl.root)])
             
-            # Optimized
+   
             avl = AVLTree('optimized')
             for i in range(n): avl.insert(i)
             avl.reset_stats()
@@ -61,17 +54,16 @@ def run_long_running(writer):
     for rep in range(1, REPETITIONS + 1):
         print(f"    ... Repetition {rep}/{REPETITIONS}")
         
-        # --- STANDARD ---
-        # Generate fresh pool for this repetition
+
         pool = list(range(LONG_RUN_SIZE * 2))
         random.shuffle(pool)
         
         avl = AVLTree('standard')
-        # Initial Population
+
         for i in range(LONG_RUN_SIZE): avl.insert(pool[i])
         avl.reset_stats()
         
-        # Steady State Ops
+
         for k in range(LONG_RUN_OPS):
             rem = pool[k % LONG_RUN_SIZE]
             add = pool[(k + LONG_RUN_SIZE) % len(pool)]
@@ -81,17 +73,14 @@ def run_long_running(writer):
             
         writer.writerow(['Long_Running', LONG_RUN_SIZE, rep, 'Standard', avl.stats['rotations'], avl.get_height(avl.root)])
         
-        # --- OPTIMIZED ---
-        # Generate fresh pool again to ensure fairness and independence
         pool = list(range(LONG_RUN_SIZE * 2)) 
         random.shuffle(pool)
 
         avl = AVLTree('optimized')
-        # Initial Population
+        
         for i in range(LONG_RUN_SIZE): avl.insert(pool[i])
         avl.reset_stats()
         
-        # Steady State Ops
         for k in range(LONG_RUN_OPS):
             rem = pool[k % LONG_RUN_SIZE]
             add = pool[(k + LONG_RUN_SIZE) % len(pool)]

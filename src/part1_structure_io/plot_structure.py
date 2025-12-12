@@ -4,12 +4,11 @@ import seaborn as sns
 from scipy.stats import linregress
 import os
 import sys
-from io import StringIO # Usado para capturar a saída do print
+from io import StringIO 
 
-# --- Configurações e Constantes ---
 CSV_REL_PATH = '../../data/results_structure.csv'
 OUT_DIR_REL_PATH = '../../analysis/structure_io'
-ANALYSIS_OUTPUT_FILENAME = 'linear_regression_analysis.txt' # Novo nome do arquivo de saída
+ANALYSIS_OUTPUT_FILENAME = 'linear_regression_analysis.txt' 
 
 def configurar_ambiente():
     """Define caminhos e cria diretórios de saída se necessário."""
@@ -51,12 +50,10 @@ def plotar_escalabilidade(df, out_dir):
     
     df_scaling = df[df['Scenario'].isin(['Random', 'Sorted'])]
 
-    # Dicionário para guardar as inclinações: { 'Scenario': { 'Method': slope } }
     analise_slopes = {}
-    
-    # --- Preparação para Capturar a Saída do Console ---
+
     old_stdout = sys.stdout
-    redirected_output = sys.stdout = StringIO() # Redireciona o print para uma string
+    redirected_output = sys.stdout = StringIO() 
 
     print("\n" + "="*50)
     print("      ANÁLISE DE REGRESSÃO LINEAR (y = ax + b)")
@@ -65,16 +62,13 @@ def plotar_escalabilidade(df, out_dir):
     grupos = df_scaling.groupby(['Method', 'Scenario'])
     
     for (method, scenario), dados_grupo in grupos:
-        # Pega a média de rotações por tamanho para o fit ser preciso
         media_por_tamanho = dados_grupo.groupby('Size')['Total_Rotations'].mean().reset_index()
         
         x = media_por_tamanho['Size']
         y = media_por_tamanho['Total_Rotations']
         
-        # Calcula regressão
         slope, intercept, r_value, _, _ = linregress(x, y)
         
-        # Guarda o slope para comparar depois
         if scenario not in analise_slopes:
             analise_slopes[scenario] = {}
         analise_slopes[scenario][method] = slope
@@ -84,7 +78,6 @@ def plotar_escalabilidade(df, out_dir):
         print(f"  R²: {r_value**2:.4f}")
         print("-" * 30)
 
-    # --- CÁLCULO DA DIFERENÇA PERCENTUAL (Baseado nos Slopes) ---
     print("\n" + "="*50)
     print("      GANHO DE PERFORMANCE (BASEADO NA INCLINAÇÃO)")
     print("="*50)
@@ -104,15 +97,13 @@ def plotar_escalabilidade(df, out_dir):
             print("-" * 30)
     print("="*50 + "\n")
 
-    # --- Fim da Captura de Saída ---
-    sys.stdout = old_stdout # Restaura o stdout original
-    analise_text = redirected_output.getvalue()
-    print(analise_text, end='') # Imprime no console o que foi capturado
 
-    # --- Registro em Arquivo ---
+    sys.stdout = old_stdout
+    analise_text = redirected_output.getvalue()
+    print(analise_text, end='')
+
     registrar_analise_em_arquivo(out_dir, analise_text)
 
-    # --- Plotagem (Mantida igual para gerar o visual) ---
     cores_personalizadas = { "Standard": "#f03a53", "Optimized": "#0bafee" }
     plt.figure(figsize=(10, 6))
     
@@ -142,34 +133,25 @@ def plotar_escalabilidade(df, out_dir):
 def _calcular_reducao_percentual(df):
     """Processa os dados para calcular a redução percentual usando SEMPRE tamanho N = 100k."""
     
-    # Média por grupo
     df_mean = df.groupby(['Scenario', 'Method', 'Size'], as_index=False)['Total_Rotations'].mean()
     
-    # Volume fixo comum a todos os cenários
     target_size = 100000
     
-    # RANDOM + SORTED para N = 100k
     df_static = df_mean[
         (df_mean['Scenario'].isin(['Random', 'Sorted'])) &
         (df_mean['Size'] == target_size)
     ].copy()
     
-    # LONG RUNNING (já é 100k)
     df_long = df_mean[df_mean['Scenario'] == 'Long_Running'].copy()
     
-    # Junta os três cenários
     df_final = pd.concat([df_static, df_long], ignore_index=True)
     
-    # Tabela pivot
     pivot = df_final.pivot(index='Scenario', columns='Method', values='Total_Rotations')
     
-    # Cálculo
     pivot['Reduction_Pct'] = ((pivot['Standard'] - pivot['Optimized']) / pivot['Standard']) * 100
     
-    # Renomeia cenário para estética
     pivot = pivot.rename(index={'Long_Running': 'Long Running'})
     
-    # Ordem correta de exibição
     pivot = pivot.reindex(['Random', 'Sorted', 'Long Running'])
     
     return pivot.reset_index()
@@ -194,7 +176,6 @@ def plotar_eficiencia(df, out_dir):
         width=0.5
     )
     
-    # Labels nas barras
     for container in ax.containers:
         ax.bar_label(container, fmt='%.1f%%', padding=5, weight='bold', fontsize=12, color='#333333')
         
@@ -212,19 +193,15 @@ def plotar_eficiencia(df, out_dir):
     plt.close()
 
 def main():
-    # 1. Configuração
     data_path, out_dir = configurar_ambiente()
-    
-    # 2. Carregamento
+
     df = carregar_dados(data_path)
     if df is None:
         return
 
-    # 3. Estilo
     definir_estilo()
     
-    # 4. Geração dos Gráficos e Registro da Análise
-    plotar_escalabilidade(df, out_dir) # Esta função agora também registra a análise
+    plotar_escalabilidade(df, out_dir) 
     plotar_eficiencia(df, out_dir)
     
     print("\nAll plots and analysis registered successfully.")
